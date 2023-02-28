@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Editor,
   Transforms,
@@ -10,6 +10,7 @@ import {
 import {
   ReactEditor,
   RenderElementProps,
+  useFocused,
   useSelected,
   useSlateStatic,
 } from 'slate-react';
@@ -21,7 +22,7 @@ import { Combobox } from '@voussoir/combobox';
 import { codeIcon } from '@voussoir/icon/icons/codeIcon';
 import { Icon } from '@voussoir/icon';
 import { Box } from '@voussoir/layout';
-import { css, tokenSchema } from '@voussoir/style';
+import { css, tokenSchema, transition } from '@voussoir/style';
 import { Tooltip, TooltipTrigger } from '@voussoir/tooltip';
 import { Kbd, Text } from '@voussoir/typography';
 
@@ -129,13 +130,16 @@ export function CodeElement({
   element,
 }: RenderElementProps & { element: { type: 'code' } }) {
   const editor = useSlateStatic();
-  const triggerRef = useRef(null);
+  const [comboboxHasFocus, setComboboxFocus] = useState(false);
+  const focused = useFocused();
   const selected = useSelected();
   const [inputValue, setInputValue] = useState(
     element.language
       ? aliasesToLabel.get(element.language) ?? element.language
       : ''
   );
+  let showLanguagePicker = comboboxHasFocus || (focused && selected);
+
   return (
     <Box position="relative">
       <Box
@@ -156,23 +160,38 @@ export function CodeElement({
             fontFamily: 'inherit',
           },
         })}
-        ref={triggerRef}
       >
         <code {...attributes}>{children}</code>
       </Box>
       <Box
+        data-visible={showLanguagePicker}
         contentEditable={false}
-        isHidden={!selected}
         position="absolute"
         insetTop="small"
         insetEnd="small"
+        UNSAFE_className={css({
+          opacity: 0,
+          visibility: 'hidden',
+          transition: [
+            transition('opacity'),
+            transition('visibility', { delay: 'short', duration: 0 }),
+          ].join(', '),
+
+          '&[data-visible=true]': {
+            opacity: 1,
+            visibility: 'visible',
+            transition: transition('opacity'),
+          },
+        })}
       >
         <Combobox
           aria-label="Language"
           width="size.scale.2000"
           allowsCustomValue // allow consumers to support other languages
           inputValue={inputValue}
+          menuTrigger="focus"
           onInputChange={setInputValue}
+          onFocusChange={setComboboxFocus}
           onBlur={() => {
             const path = ReactEditor.findPath(editor, element);
             const canonicalName = aliasesToCanonicalName.get(inputValue);
@@ -275,9 +294,9 @@ const languages = [
   { label: 'Makefile', value: 'makefile' },
   { label: 'Markdown', value: 'markdown' },
   { label: 'Objective-C', value: 'objectivec' },
-  // { label: 'Plain text', value: 'plaintext' },
   { label: 'Perl', value: 'perl' },
   { label: 'PHP', value: 'php' },
+  // { label: 'Plain text', value: 'plaintext' },
   { label: 'Python', value: 'python' },
   { label: 'R', value: 'r' },
   { label: 'Ruby', value: 'ruby' },
